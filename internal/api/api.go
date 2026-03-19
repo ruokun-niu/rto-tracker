@@ -34,6 +34,8 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("/api/policies", h.handlePolicies)
 	h.mux.HandleFunc("/api/policy/activate", h.handleActivatePolicy)
 	h.mux.HandleFunc("/api/policy", h.handlePolicy)
+	h.mux.HandleFunc("/api/export", h.handleExport)
+	h.mux.HandleFunc("/api/import", h.handleImport)
 }
 
 // POST /api/badge — badge in (optional ?date=YYYY-MM-DD, defaults to today)
@@ -175,6 +177,44 @@ func (h *Handler) handlePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"status": "deleted"})
+}
+
+// GET /api/export — export all data as base64 string
+func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	encoded, err := h.store.Export()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, map[string]string{"data": encoded})
+}
+
+// POST /api/import — import data from base64 string
+func (h *Handler) handleImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if req.Data == "" {
+		writeError(w, http.StatusBadRequest, "data field required")
+		return
+	}
+	if err := h.store.Import(req.Data); err != nil {
+		writeError(w, http.StatusBadRequest, "import failed: "+err.Error())
+		return
+	}
+	writeJSON(w, map[string]string{"status": "imported"})
 }
 
 func writeJSON(w http.ResponseWriter, data interface{}) {

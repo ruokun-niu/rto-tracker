@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -237,6 +239,88 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// --- Export/Import ---
+
+// ExportData represents all exportable data
+type ExportData struct {
+	Version  int             `json:"version"`
+	Badges   []BadgeRecord   `json:"badges"`
+	Policies []PolicyConfig  `json:"policies"`
+}
+
+// Export serializes all data to a base64-encoded string.
+func (s *Store) Export() (string, error) {
+	badges, err := s.GetBadges()
+	if err != nil {
+		return "", fmt.Errorf("get badges: %w", err)
+	}
+	policies, err := s.GetPolicies()
+	if err != nil {
+		return "", fmt.Errorf("get policies: %w", err)
+	}
+	
+	data := ExportData{
+		Version:  1,
+		Badges:   badges,
+		Policies: policies,
+	}
+	
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", fmt.Errorf("marshal: %w", err)
+	}
+	
+	return base64.StdEncoding.EncodeToString(jsonBytes), nil
+}
+
+// Import decodes a base64 string and replaces all data.
+func (s *Store) Import(encoded string) error {
+	jsonBytes, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return fmt.Errorf("decode base64: %w", err)
+	}
+	
+	var data ExportData
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		return fmt.Errorf("unmarshal json: %w", err)
+	}
+	
+	// Begin transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	
+	// Clear existing data
+	if _, err := tx.Exec("DELETE FROM badge_records"); err != nil {
+		return fmt.Errorf("clear badges: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM policies"); err != nil {
+		return fmt.Errorf("clear policies: %w", err)
+	}
+	
+	// Insert badges
+	for _, b := range data.Badges {
+		if _, err := tx.Exec("INSERT INTO badge_records (date) VALUES (?)", b.Date); err != nil {
+			return fmt.Errorf("insert badge %s: %w", b.Date, err)
+		}
+	}
+	
+	// Insert policies
+	for _, p := range data.Policies {
+		if _, err := tx.Exec(
+			`INSERT INTO policies (name, days_per_week, policy_type, window_weeks, best_weeks, active)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			p.Name, p.DaysPerWeek, p.PolicyType, p.WindowWeeks, p.BestWeeks, boolToInt(p.Active),
+		); err != nil {
+			return fmt.Errorf("insert policy %s: %w", p.Name, err)
+		}
+	}
+	
+	return tx.Commit()
 }
 
 // Close closes the underlying database.

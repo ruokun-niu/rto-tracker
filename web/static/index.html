@@ -307,6 +307,7 @@ header p {
     <button class="tab active" data-tab="dashboard">Dashboard</button>
     <button class="tab" data-tab="history">Badge History</button>
     <button class="tab" data-tab="policies">Policies</button>
+    <button class="tab" data-tab="backup">Backup</button>
   </div>
 
   <!-- Dashboard Tab -->
@@ -381,6 +382,34 @@ header p {
         </div>
       </div>
       <button class="btn btn-primary" onclick="addPolicy()">Add Policy</button>
+    </div>
+  </div>
+
+  <!-- Backup Tab -->
+  <div id="tab-backup" class="tab-content">
+    <div class="card">
+      <h2>&#x1F4BE; Export Data</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+        Export all your badge records and policies as a text string. Copy this string to back up your data.
+      </p>
+      <button class="btn btn-primary" onclick="exportData()">Generate Export String</button>
+      <div class="form-group" style="margin-top: 1rem;" id="export-result" hidden>
+        <label>Export String (copy this)</label>
+        <textarea id="export-text" readonly style="width: 100%; min-height: 150px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.75rem; resize: vertical;"></textarea>
+        <button class="btn btn-ghost" style="margin-top: 0.5rem;" onclick="copyExport()">Copy to Clipboard</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>&#x1F4E5; Import Data</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+        Paste an export string to restore your data. <strong style="color: var(--danger);">Warning:</strong> This will replace all existing data!
+      </p>
+      <div class="form-group">
+        <label>Paste Export String</label>
+        <textarea id="import-text" placeholder="Paste your export string here..." style="width: 100%; min-height: 150px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.75rem; resize: vertical;"></textarea>
+      </div>
+      <button class="btn btn-danger" onclick="importData()">Import & Replace All Data</button>
     </div>
   </div>
 </div>
@@ -576,6 +605,52 @@ async function addPolicy() {
   });
   document.getElementById('pol-name').value = '';
   toast('Policy added');
+  loadPolicies();
+}
+
+// --- Export/Import ---
+async function exportData() {
+  const result = await api('/api/export');
+  if (result.error) {
+    toast('Export failed: ' + result.error, 'error');
+    return;
+  }
+  document.getElementById('export-text').value = result.data;
+  document.getElementById('export-result').hidden = false;
+  toast('Export string generated!');
+}
+
+function copyExport() {
+  const text = document.getElementById('export-text').value;
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Copied to clipboard!');
+  }).catch(() => {
+    toast('Failed to copy', 'error');
+  });
+}
+
+async function importData() {
+  const text = document.getElementById('import-text').value.trim();
+  if (!text) {
+    toast('Paste an export string first', 'error');
+    return;
+  }
+  if (!confirm('This will REPLACE ALL existing data. Are you sure?')) {
+    return;
+  }
+  const result = await api('/api/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: text })
+  });
+  if (result.error) {
+    toast('Import failed: ' + result.error, 'error');
+    return;
+  }
+  document.getElementById('import-text').value = '';
+  toast('Data imported successfully!');
+  loadStatus();
+  loadBadges();
   loadPolicies();
 }
 
