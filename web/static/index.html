@@ -364,21 +364,22 @@ header p {
         </div>
         <div class="form-group">
           <label>Policy Type</label>
-          <select id="pol-type">
+          <select id="pol-type" onchange="handlePolicyTypeChange()">
             <option value="belt_average">BELT — Rolling Average</option>
             <option value="belt_strict">BELT — Strict (each week)</option>
             <option value="straight">Straight (every week)</option>
+            <option value="custom">Custom</option>
           </select>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Window (weeks)</label>
-          <input type="number" id="pol-window" value="12" min="1" max="52">
+          <input type="number" id="pol-window" value="12" min="1" max="52" oninput="handleWindowBestChange()">
         </div>
         <div class="form-group">
           <label>Best N Weeks (BELT only)</label>
-          <input type="number" id="pol-best" value="8" min="1" max="52">
+          <input type="number" id="pol-best" value="8" min="1" max="52" oninput="handleWindowBestChange()">
         </div>
       </div>
       <button class="btn btn-primary" onclick="addPolicy()">Add Policy</button>
@@ -556,7 +557,8 @@ async function loadPolicies() {
   const typeLabels = {
     'belt_average': 'BELT Average',
     'belt_strict': 'BELT Strict',
-    'straight': 'Straight'
+    'straight': 'Straight',
+    'custom': 'Custom'
   };
   list.innerHTML = policies.map(p => `
     <div class="policy-item ${p.active ? 'active' : ''}">
@@ -570,6 +572,42 @@ async function loadPolicies() {
       </div>
     </div>
   `).join('');
+}
+
+function handlePolicyTypeChange() {
+  const type = document.getElementById('pol-type').value;
+  const windowInput = document.getElementById('pol-window');
+  const bestInput = document.getElementById('pol-best');
+  
+  // Auto-populate defaults for BELT policies
+  if (type === 'belt_average' || type === 'belt_strict') {
+    windowInput.value = 12;
+    bestInput.value = 8;
+  } else if (type === 'straight') {
+    // Straight policy typically uses all weeks in window
+    windowInput.value = 12;
+    bestInput.value = 12;
+  }
+  // For custom, keep whatever values are there
+}
+
+let isUserEditingFields = false;
+
+function handleWindowBestChange() {
+  const type = document.getElementById('pol-type').value;
+  const windowVal = parseInt(document.getElementById('pol-window').value);
+  const bestVal = parseInt(document.getElementById('pol-best').value);
+  
+  // If user manually changes values and it's not already custom, switch to custom
+  if (type !== 'custom') {
+    const isBeltDefault = (windowVal === 12 && bestVal === 8);
+    const isStraightDefault = (windowVal === 12 && bestVal === 12);
+    
+    // Only switch to custom if values don't match any standard preset
+    if (!isBeltDefault && !isStraightDefault) {
+      document.getElementById('pol-type').value = 'custom';
+    }
+  }
 }
 
 async function activatePolicy(id) {
