@@ -8,9 +8,9 @@ Launches a local web UI in your browser — no accounts, no cloud, all data stay
 
 All data is stored in a SQLite database. You can export and import your data via the Backup tab to move it between machines or keep a backup.
 
-![Dashboard](docs/docs/main.png)
+![Dashboard](docs/images/main.png)
 
-![Policies](docs/docs/policies.png)
+![Policies](docs/images/policies.png)
 
 ## Features
 
