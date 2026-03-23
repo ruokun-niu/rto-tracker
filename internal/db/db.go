@@ -31,6 +31,7 @@ type PolicyConfig struct {
 	PolicyType     string `json:"policy_type"`      // "belt_average", "belt_strict", "straight"
 	WindowWeeks    int    `json:"window_weeks"`     // e.g., 12
 	BestWeeks      int    `json:"best_weeks"`       // e.g., 8 (only for BELT policies)
+	StartDate      string `json:"start_date"`       // Date from which RTO tracking begins (YYYY-MM-DD)
 	Active         bool   `json:"active"`
 }
 
@@ -83,12 +84,23 @@ func migrate(db *sql.DB) error {
 			policy_type TEXT NOT NULL DEFAULT 'belt_average',
 			window_weeks INTEGER NOT NULL DEFAULT 12,
 			best_weeks INTEGER NOT NULL DEFAULT 8,
+			start_date TEXT,
 			active INTEGER NOT NULL DEFAULT 0
 		)`,
 	}
 	for _, s := range statements {
 		if _, err := db.Exec(s); err != nil {
 			return fmt.Errorf("exec %q: %w", s, err)
+		}
+	}
+
+	// Add start_date column if it doesn't exist (migration for existing databases)
+	var hasStartDate int
+	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('policies') WHERE name='start_date'").Scan(&hasStartDate)
+	if err == nil && hasStartDate == 0 {
+		_, err = db.Exec("ALTER TABLE policies ADD COLUMN start_date TEXT")
+		if err != nil {
+			return fmt.Errorf("add start_date column: %w", err)
 		}
 	}
 
@@ -167,15 +179,19 @@ func (s *Store) GetBadgesInRange(startDate, endDate string) ([]BadgeRecord, erro
 
 // GetActivePolicy returns the currently active policy.
 func (s *Store) GetActivePolicy() (*PolicyConfig, error) {
-	row := s.db.QueryRow("SELECT id, name, days_per_week, policy_type, window_weeks, best_weeks, active FROM policies WHERE active = 1 LIMIT 1")
+	row := s.db.QueryRow("SELECT id, name, days_per_week, policy_type, window_weeks, best_weeks, start_date, active FROM policies WHERE active = 1 LIMIT 1")
 	p := &PolicyConfig{}
 	var active int
-	err := row.Scan(&p.ID, &p.Name, &p.DaysPerWeek, &p.PolicyType, &p.WindowWeeks, &p.BestWeeks, &active)
+	var startDate sql.NullString
+	err := row.Scan(&p.ID, &p.Name, &p.DaysPerWeek, &p.PolicyType, &p.WindowWeeks, &p.BestWeeks, &startDate, &active)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if startDate.Valid {
+		p.StartDate = startDate.String
 	}
 	p.Active = active == 1
 	return p, nil
@@ -183,7 +199,7 @@ func (s *Store) GetActivePolicy() (*PolicyConfig, error) {
 
 // GetPolicies returns all policies.
 func (s *Store) GetPolicies() ([]PolicyConfig, error) {
-	rows, err := s.db.Query("SELECT id, name, days_per_week, policy_type, window_weeks, best_weeks, active FROM policies ORDER BY id")
+	rows, err := s.db.Query("SELECT id, name, days_per_week, policy_type, window_weeks, best_weeks, start_date, active FROM policies ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +208,12 @@ func (s *Store) GetPolicies() ([]PolicyConfig, error) {
 	for rows.Next() {
 		var p PolicyConfig
 		var active int
-		if err := rows.Scan(&p.ID, &p.Name, &p.DaysPerWeek, &p.PolicyType, &p.WindowWeeks, &p.BestWeeks, &active); err != nil {
+		var startDate sql.NullString
+		if err := rows.Scan(&p.ID, &p.Name, &p.DaysPerWeek, &p.PolicyType, &p.WindowWeeks, &p.BestWeeks, &startDate, &active); err != nil {
 			return nil, err
+		}
+		if startDate.Valid {
+			p.StartDate = startDate.String
 		}
 		p.Active = active == 1
 		policies = append(policies, p)
@@ -203,8 +223,14 @@ func (s *Store) GetPolicies() ([]PolicyConfig, error) {
 
 // CreatePolicy inserts a new policy.
 func (s *Store) CreatePolicy(p PolicyConfig) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO policies (name, days_per_week, policy_type, window_weeks, best_weeks, active)
-		VALUES (?, ?, ?, ?, ?, ?)`, p.Name, p.DaysPerWeek, p.PolicyType, p.WindowWeeks, p.BestWeeks, boolToInt(p.Active))
+	var startDate interface{}
+	if p.StartDate != "" {
+		startDate = p.StartDate
+	} else {
+		startDate = nil
+	}
+	res, err := s.db.Exec(`INSERT INTO policies (name, days_per_week, policy_type, window_weeks, best_weeks, start_date, active)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, p.Name, p.DaysPerWeek, p.PolicyType, p.WindowWeeks, p.BestWeeks, startDate, boolToInt(p.Active))
 	if err != nil {
 		return 0, err
 	}

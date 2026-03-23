@@ -52,6 +52,18 @@ func EvaluateAt(store *db.Store, pol *db.PolicyConfig, now time.Time) (*Complian
 	currentMonday := startOfWeek(now)
 	// The window goes back windowWeeks weeks from the START of the current week.
 	windowStart := currentMonday.AddDate(0, 0, -7*(pol.WindowWeeks-1))
+	
+	// If policy has a start date, ensure windowStart is not earlier than the start date
+	if pol.StartDate != "" {
+		startDate, err := time.Parse("2006-01-02", pol.StartDate)
+		if err == nil {
+			startMonday := startOfWeek(startDate)
+			if windowStart.Before(startMonday) {
+				windowStart = startMonday
+			}
+		}
+	}
+	
 	windowEnd := currentMonday.AddDate(0, 0, 6) // Sunday of current week
 
 	badges, err := store.GetBadgesInRange(
@@ -69,8 +81,15 @@ func EvaluateAt(store *db.Store, pol *db.PolicyConfig, now time.Time) (*Complian
 	}
 
 	// Build weekly summaries.
-	weeks := make([]WeekDetail, 0, pol.WindowWeeks)
-	for i := 0; i < pol.WindowWeeks; i++ {
+	// Calculate actual number of weeks based on the adjusted window
+	weeksDiff := int(currentMonday.Sub(windowStart).Hours() / 24 / 7)
+	numWeeks := weeksDiff + 1 // +1 to include the current week
+	if numWeeks > pol.WindowWeeks {
+		numWeeks = pol.WindowWeeks
+	}
+	
+	weeks := make([]WeekDetail, 0, numWeeks)
+	for i := 0; i < numWeeks; i++ {
 		monday := windowStart.AddDate(0, 0, 7*i)
 		sunday := monday.AddDate(0, 0, 6)
 		count := 0

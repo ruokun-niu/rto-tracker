@@ -382,6 +382,13 @@ header p {
           <input type="number" id="pol-best" value="8" min="1" max="52" oninput="handleWindowBestChange()">
         </div>
       </div>
+      <div class="form-group">
+        <label>Start Date (optional)</label>
+        <input type="date" id="pol-start-date" placeholder="Leave empty to track from the beginning">
+        <small style="color: var(--text-muted); display: block; margin-top: 0.25rem;">
+          The date from which RTO tracking begins. The 12-week period will only start calculating from this date.
+        </small>
+      </div>
       <button class="btn btn-primary" onclick="addPolicy()">Add Policy</button>
     </div>
   </div>
@@ -564,7 +571,7 @@ async function loadPolicies() {
     <div class="policy-item ${p.active ? 'active' : ''}">
       <div class="policy-info">
         <div class="policy-name">${p.name} ${p.active ? '(Active)' : ''}</div>
-        <div class="policy-detail">${typeLabels[p.policy_type] || p.policy_type} · ${p.days_per_week} days/wk · Window: ${p.window_weeks}wk${p.policy_type !== 'straight' ? ' · Best: ' + p.best_weeks + 'wk' : ''}</div>
+        <div class="policy-detail">${typeLabels[p.policy_type] || p.policy_type} · ${p.days_per_week} days/wk · Window: ${p.window_weeks}wk${p.policy_type !== 'straight' ? ' · Best: ' + p.best_weeks + 'wk' : ''}${p.start_date ? ' · Start: ' + p.start_date : ''}</div>
       </div>
       <div class="policy-actions">
         ${!p.active ? `<button class="btn btn-primary btn-sm" onclick="activatePolicy(${p.id})">Activate</button>` : ''}
@@ -628,12 +635,14 @@ async function deletePolicy(id) {
 async function addPolicy() {
   const name = document.getElementById('pol-name').value.trim();
   if (!name) { toast('Enter a policy name', 'error'); return; }
+  const startDate = document.getElementById('pol-start-date').value.trim();
   const body = {
     name: name,
     days_per_week: parseInt(document.getElementById('pol-days').value),
     policy_type: document.getElementById('pol-type').value,
     window_weeks: parseInt(document.getElementById('pol-window').value),
     best_weeks: parseInt(document.getElementById('pol-best').value),
+    start_date: startDate || "",
     active: false
   };
   await api('/api/policies', {
@@ -642,6 +651,7 @@ async function addPolicy() {
     body: JSON.stringify(body)
   });
   document.getElementById('pol-name').value = '';
+  document.getElementById('pol-start-date').value = '';
   toast('Policy added');
   loadPolicies();
 }
