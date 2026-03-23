@@ -1,8 +1,16 @@
 # RTO Tracker
 
+This is a simple tool that is 100% vibe coded. Helps me with keeping track of my badge history and see if I am RTO compliant.
+
 A lightweight, cross-platform tool for tracking your office badge-ins and staying compliant with your company's return-to-office (RTO) policy.
 
-Launches a local web UI in your browser — no accounts, no cloud, all data stays on your machine.
+Launches a local web UI in your browser — no accounts, no cloud, all data stays on your machine. It does not use React but rather plain vanilla HTML, CSS, and JavaScript — a single self-contained page with zero dependencies. 
+
+All data is stored in a SQLite database. You can export and import your data via the Backup tab to move it between machines or keep a backup.
+
+![Dashboard](docs/docs/main.png)
+
+![Policies](docs/docs/policies.png)
 
 ## Features
 
