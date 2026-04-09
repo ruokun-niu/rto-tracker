@@ -1,6 +1,6 @@
 # RTO Tracker
 
-This is a simple tool that is 100% vibe coded. Helps me with keeping track of my badge history and see if I am RTO compliant.
+This is a simple tool that was 100% vibe coded. Helps me with keeping track of my badge history and see if I am RTO compliant.
 
 A lightweight, cross-platform tool for tracking your office badge-ins and staying compliant with your company's return-to-office (RTO) policy.
 
