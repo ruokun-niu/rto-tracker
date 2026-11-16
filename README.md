@@ -67,6 +67,8 @@ GOOS=darwin GOARCH=arm64 go build -o rto-tracker .
 2. **Check Compliance** — The dashboard shows whether you're meeting your policy, how many more days you need, and a per-week breakdown.
 3. **Manage Policies** — Go to the Policies tab to add, activate, or remove policies. Only one policy is active at a time.
 
+All policies count weeks from Sunday through Saturday. Rolling windows include the current week.
+
 ### Policy Examples
 
 | Company Rule | Policy Type | Days/Week | Window | Best Weeks |

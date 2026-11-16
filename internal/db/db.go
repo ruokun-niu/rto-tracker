@@ -40,8 +40,8 @@ type PolicyConfig struct {
 
 // WeekSummary holds badge count for a given week.
 type WeekSummary struct {
-	WeekStart string `json:"week_start"` // Monday date YYYY-MM-DD
-	WeekEnd   string `json:"week_end"`   // Sunday date
+	WeekStart string `json:"week_start"` // Sunday date YYYY-MM-DD
+	WeekEnd   string `json:"week_end"`   // Saturday date
 	Count     int    `json:"count"`
 }
 

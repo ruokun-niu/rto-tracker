@@ -51,23 +51,23 @@ func Evaluate(store *db.Store) (*ComplianceStatus, error) {
 
 // EvaluateAt computes compliance status for a policy at a specific point in time.
 func EvaluateAt(store *db.Store, pol *db.PolicyConfig, now time.Time) (*ComplianceStatus, error) {
-	// Find the Monday of the current week.
-	currentMonday := startOfWeek(now)
+	// Find the Sunday of the current week.
+	currentSunday := startOfWeek(now)
 	// The window goes back windowWeeks weeks from the START of the current week.
-	windowStart := currentMonday.AddDate(0, 0, -7*(pol.WindowWeeks-1))
+	windowStart := currentSunday.AddDate(0, 0, -7*(pol.WindowWeeks-1))
 	
 	// If policy has a start date, ensure windowStart is not earlier than the start date
 	if pol.StartDate != "" {
 		startDate, err := time.Parse("2006-01-02", pol.StartDate)
 		if err == nil {
-			startMonday := startOfWeek(startDate)
-			if windowStart.Before(startMonday) {
-				windowStart = startMonday
+			startSunday := startOfWeek(startDate)
+			if windowStart.Before(startSunday) {
+				windowStart = startSunday
 			}
 		}
 	}
 	
-	windowEnd := currentMonday.AddDate(0, 0, 6) // Sunday of current week
+	windowEnd := currentSunday.AddDate(0, 0, 6) // Saturday of current week
 
 	badges, err := store.GetBadgesInRange(
 		windowStart.Format("2006-01-02"),
@@ -85,7 +85,7 @@ func EvaluateAt(store *db.Store, pol *db.PolicyConfig, now time.Time) (*Complian
 
 	// Build weekly summaries.
 	// Calculate actual number of weeks based on the adjusted window
-	weeksDiff := int(currentMonday.Sub(windowStart).Hours() / 24 / 7)
+	weeksDiff := int(currentSunday.Sub(windowStart).Hours() / 24 / 7)
 	numWeeks := weeksDiff + 1 // +1 to include the current week
 	if numWeeks > pol.WindowWeeks {
 		numWeeks = pol.WindowWeeks
@@ -93,17 +93,17 @@ func EvaluateAt(store *db.Store, pol *db.PolicyConfig, now time.Time) (*Complian
 	
 	weeks := make([]WeekDetail, 0, numWeeks)
 	for i := 0; i < numWeeks; i++ {
-		monday := windowStart.AddDate(0, 0, 7*i)
-		sunday := monday.AddDate(0, 0, 6)
+		sunday := windowStart.AddDate(0, 0, 7*i)
+		saturday := sunday.AddDate(0, 0, 6)
 		count := 0
-		for d := monday; !d.After(sunday); d = d.AddDate(0, 0, 1) {
+		for d := sunday; !d.After(saturday); d = d.AddDate(0, 0, 1) {
 			if badgeSet[d.Format("2006-01-02")] {
 				count++
 			}
 		}
 		weeks = append(weeks, WeekDetail{
-			WeekStart: monday.Format("2006-01-02"),
-			WeekEnd:   sunday.Format("2006-01-02"),
+			WeekStart: sunday.Format("2006-01-02"),
+			WeekEnd:   saturday.Format("2006-01-02"),
 			Count:     count,
 			Required:  pol.DaysPerWeek,
 		})
@@ -270,12 +270,8 @@ func evaluateStraight(status *ComplianceStatus, weeks []WeekDetail, pol *db.Poli
 	}
 }
 
-// startOfWeek returns the Monday of the week containing t.
+// startOfWeek returns the Sunday of the week containing t.
 func startOfWeek(t time.Time) time.Time {
 	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-	weekday := t.Weekday()
-	if weekday == time.Sunday {
-		weekday = 7
-	}
-	return t.AddDate(0, 0, -int(weekday-time.Monday))
+	return t.AddDate(0, 0, -int(t.Weekday()))
 }
